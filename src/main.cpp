@@ -34,10 +34,10 @@ RadioAdapter radioAdapter(NRF_CE_PIN, NRF_CSN_PIN, NRF_ADDRESS);
 // // Define services
 // RadioService radioService(radioDriver);
 
-DroneCommand droneCommand(0, 0, 0, 0);
+DroneCommand droneCommand(0, 0, 0, 0, 0, 0, 0, 0);
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(9600);
     Serial.println("Initializing Drone TX Controller...");
     radioAdapter.begin();
     if (!radioAdapter.isChipConnected()){
@@ -60,11 +60,19 @@ void loop() {
     droneCommand.setRoll(joyParser.getRoll());
     droneCommand.setYaw(joyParser.getYaw());
     droneCommand.setThrottle(joyParser.getThrottle());
+    droneCommand.setPitchTrim(joyParser.getPitchTrim());
+    droneCommand.setRollTrim(joyParser.getRollTrim());
+    droneCommand.setYawTrim(joyParser.getYawTrim());
+    droneCommand.setTrimReset(joyParser.getTrimReset());
     Serial.print("Sending command: ");
     Serial.print("Pitch: "); Serial.print(droneCommand.getPitch());
     Serial.print(" | Roll: "); Serial.print(droneCommand.getRoll());
     Serial.print(" | Yaw: "); Serial.print(droneCommand.getYaw());
-    Serial.print(" | Throttle: "); Serial.println(droneCommand.getThrottle());
+    Serial.print(" | Throttle: "); Serial.print(droneCommand.getThrottle());
+    Serial.print(" | Pitch trim: "); Serial.print(droneCommand.getPitchTrim());
+    Serial.print(" | Roll trim: "); Serial.print(droneCommand.getRollTrim());
+    Serial.print(" | Yaw trim: "); Serial.print(droneCommand.getYawTrim());
+    Serial.print(" | Trim reset: "); Serial.println(droneCommand.getTrimReset());
     bool commandSent = radioAdapter.send(droneCommand);
     Serial.print("Command sent: "); Serial.println(commandSent);
     delay(10);
