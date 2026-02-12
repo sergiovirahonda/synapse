@@ -22,6 +22,7 @@ void RadioAdapter::begin() {
     this->radio.setChannel(108); // Avoid WiFi interference (Above 2.48GHz) 
     this->radio.openWritingPipe(this->address);
     this->radio.stopListening(); // TX mode
+    this->radio.setRetries(2, 3);
 }
 
 bool RadioAdapter::isChipConnected() {

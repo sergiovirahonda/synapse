@@ -3,12 +3,12 @@
 #include <nRF24L01.h>
 #include <RF24.h>
 #include <Arduino.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Wire.h>
+#include <SSD1306Ascii.h>
+#include <SSD1306AsciiWire.h>
 #include <usbhid.h>
 #include <hiduniversal.h>
 #include <usbhub.h>
-#include <Wire.h>
 
 // Internal Libraries
 #include "models/drone_command.h"
@@ -22,66 +22,58 @@ USBHub  Hub(&Usb);
 HIDUniversal Hid(&Usb);
 T16000MParser joyParser;
 
-// Define radio CE & CSN pins
+// Define radio address & pins
 byte NRF_ADDRESS[6] = "00001";
-
-// Global variables
-
-// Define radio CE & CSN pins
 const int NRF_CE_PIN = 7;   // Connect NRF24L01 CE to Arduino D7
 const int NRF_CSN_PIN = 8;  // Connect NRF24L01 CSN to Arduino D8
 
 // ---------------------------------------------------------
 // SCREEN DEFINITIONS
 // ---------------------------------------------------------
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_ADDR 0x3C // Almost all 0.96" OLEDs are 0x3C
+#define OLED_ADDR 0x3C
+
+static unsigned long lastScreenUpdate = 0;
 
 // Define adapters
 RadioAdapter radioAdapter(NRF_CE_PIN, NRF_CSN_PIN, NRF_ADDRESS);
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+SSD1306AsciiWire display;
 
 // Global variables
-
 DroneCommand droneCommand(0, 0, 0, 0, 0, 0, 0, 0);
 TelemetryData telemetryData(0, 0, 0);
 
 void setup() {
     Serial.begin(9600);
 
-    // 2. Initialize OLED
-    // 2. Initialize OLED
-    if(!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
-        Serial.println(F("SSD1306 allocation failed. Checking I2C connection..."));
-        for(;;); // Don't proceed, loop forever
-    }
-    // 4. Set Text Properties
-    display.clearDisplay();
-    display.invertDisplay(false);
-    display.setTextSize(1);             // Normal 1:1 pixel scale
-    display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(0,0); 
+    // 1. Initialize OLED
+    Wire.begin();
+    Wire.setClock(400000L); // Fast I2C
+    display.begin(&Adafruit128x64, OLED_ADDR);
+    display.setFont(Adafruit5x7);
+    display.clear();
+    display.println(F("Synapse TX starting..."));
 
-    // 2. Initialize Drivers (BUT DO NOT ARM YET)
-    display.println("Initializing adapters...");
+    // 2. Initialize Radio
+    display.println(F("Init radio..."));
     radioAdapter.begin();
-    if (!radioAdapter.isChipConnected()){
-        display.println("Radio hardware failed.");
-        display.println("Radio chip not connected properly!");
-        display.display();
-        while(1);
-
-    }
-    if (Usb.Init() == -1) {
-        display.println("USB Host Shield initialization failed!");
-        display.display();
+    if (!radioAdapter.isChipConnected()) {
+        display.println(F("Radio chip FAILED!"));
         while (1);
     }
-    display.println("USB Host Shield initialized.");
+    display.println(F("Radio OK."));
+
+    // 3. Initialize USB Host Shield
+    display.println(F("Init USB Host..."));
+    if (Usb.Init() == -1) {
+        display.println(F("USB Host FAILED!"));
+        while (1);
+    }
+    display.println(F("USB Host OK."));
     Hid.SetReportParser(0, &joyParser);
-    display.display();
+
+    display.println(F("All systems ready."));
+    delay(1000);
+    display.clear(); // Wipe boot messages before entering loop
 }
 
 void loop() {
@@ -94,15 +86,24 @@ void loop() {
     droneCommand.setRollTrim(joyParser.getRollTrim());
     droneCommand.setYawTrim(joyParser.getYawTrim());
     droneCommand.setTrimReset(joyParser.getTrimReset());
-    display.println(" -- SYSTEM READY -- ");
-    display.print("T: "); display.print(droneCommand.getThrottle());
     bool commandSent = radioAdapter.send(droneCommand);
-    display.print(" | Sent: "); display.println((commandSent));
     bool telemetryReceived = radioAdapter.receiveTelemetry(telemetryData);
-    display.print("Ack: "); display.print((telemetryReceived));
-    display.print(" | PWM: "); display.print(telemetryData.getPwm());
-    display.print(" | Roll: "); display.print(telemetryData.getRoll());
-    display.print(" | Pitch: "); display.println(telemetryData.getPitch());
-    display.display();
+    if (millis() - lastScreenUpdate > 500) {
+        display.setCursor(0, 0);
+
+        display.println(F("  -- SYSTEM READY --"));
+        display.print(F("T: "));      display.print(droneCommand.getThrottle());
+        display.print(F(" | Sent: ")); display.print(commandSent);
+        display.clearToEOL();          display.println(); display.println();
+        display.println(F("   -- TELEMETRY --"));
+        display.print(F("Ack: "));    display.print(telemetryReceived);
+        display.print(F(" | PWM: ")); display.print(telemetryData.getPwm());
+        display.clearToEOL();          display.println();
+        display.print(F("Roll: "));   display.print(telemetryData.getRoll());
+        display.print(F(" | Pitch: ")); display.print(telemetryData.getPitch());
+        display.clearToEOL();          display.println();
+
+        lastScreenUpdate = millis();
+    }
     delay(10);
 }
