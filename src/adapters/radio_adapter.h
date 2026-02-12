@@ -17,6 +17,7 @@ class RadioAdapter {
         void begin();
         bool isChipConnected();
         bool send(const DroneCommand& packet);
+        bool receiveTelemetry(TelemetryData& data);
 };
 
 #endif

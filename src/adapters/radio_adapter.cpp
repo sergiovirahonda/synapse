@@ -15,12 +15,14 @@ void RadioAdapter::begin() {
         Serial.println("Radio hardware not responding!");
         while (1);
     }
-    this->radio.setAutoAck(false);
-    this->radio.setPALevel(RF24_PA_LOW);  // Match TX side
+    this->radio.setAutoAck(true);
+    this->radio.enableAckPayload();
+    this->radio.setPALevel(RF24_PA_HIGH);  // Match TX side
     this->radio.setDataRate(RF24_250KBPS); // Longest Range
     this->radio.setChannel(108); // Avoid WiFi interference (Above 2.48GHz) 
     this->radio.openWritingPipe(this->address);
     this->radio.stopListening(); // TX mode
+    this->radio.setRetries(2, 3);
 }
 
 bool RadioAdapter::isChipConnected() {
@@ -29,4 +31,12 @@ bool RadioAdapter::isChipConnected() {
 
 bool RadioAdapter::send(const DroneCommand& packet) {
     return this->radio.write(&packet, sizeof(packet));
+}
+
+bool RadioAdapter::receiveTelemetry(TelemetryData& data) {
+    if (radio.isAckPayloadAvailable()) {
+        radio.read(&data, sizeof(data));
+        return true;
+    }
+    return false;
 }
