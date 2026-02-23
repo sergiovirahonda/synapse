@@ -89,8 +89,9 @@ void loop() {
     bool commandSent = radioAdapter.send(droneCommand);
     bool telemetryReceived = radioAdapter.receiveTelemetry(telemetryData);
     if (millis() - lastScreenUpdate > 500) {
+        float roll = (float)telemetryData.getRoll() / 100.0f;
+        float pitch = (float)telemetryData.getPitch() / 100.0f;
         display.setCursor(0, 0);
-
         display.println(F("  -- SYSTEM READY --"));
         display.print(F("T: "));      display.print(droneCommand.getThrottle());
         display.print(F(" | Sent: ")); display.print(commandSent);
@@ -99,8 +100,8 @@ void loop() {
         display.print(F("Ack: "));    display.print(telemetryReceived);
         display.print(F(" | PWM: ")); display.print(telemetryData.getPwm());
         display.clearToEOL();          display.println();
-        display.print(F("Roll: "));   display.print(telemetryData.getRoll());
-        display.print(F(" | Pitch: ")); display.print(telemetryData.getPitch());
+        display.print(F("Roll: "));   display.print(roll);
+        display.print(F(" | Pitch: ")); display.print(pitch);
         display.clearToEOL();          display.println();
 
         lastScreenUpdate = millis();

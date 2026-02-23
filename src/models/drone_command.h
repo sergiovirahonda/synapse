@@ -71,7 +71,10 @@ class DroneCommand {
         void loadFromPacket(DronePacket packet);
 };
 
-// --- TELEMETRY WIRE FORMAT ---
+// --- TELEMETRY WIRE FORMAT (6 bytes: pwm, roll, pitch only) ---
+// Roll/pitch are sent as angle_degrees * TELEMETRY_ANGLE_SCALE; TX displays as value/100.0
+const int TELEMETRY_ANGLE_SCALE = 100.0f;
+
 struct TelemetryPacket {
     int16_t pwm;   // Motor PWM
     int16_t roll;  // Roll (e.g. x100 for degrees)
