@@ -17,6 +17,7 @@ public:
     void setRollTrim(int rollTrim);
     void setYawTrim(int yawTrim);
     void setTrimReset(int reset);
+    void setAltitudeHold(int on);
     void reset();
     
     // Getters
@@ -28,6 +29,7 @@ public:
     int getRollTrim();
     int getYawTrim();
     int getTrimReset();
+    int getAltitudeHold();
     
     // Override Parse method
     void Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf) override;
@@ -41,6 +43,7 @@ private:
     int rollTrim;
     int yawTrim;
     int trimReset;
+    int altitudeHold;  // 1 = enable (buf[0] bit 4), 0 = off
     int mapAxis(int value, int minVal, int maxVal, int center);
 };
 

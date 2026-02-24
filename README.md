@@ -10,7 +10,8 @@ Synapse is the control interface for your DIY drone project. It reads input from
 
 - 🎮 **USB Joystick Support**: Native support for Thrustmaster T16000M via USB Host Shield
 - 📡 **Wireless Communication**: Reliable nRF24L01 radio transmission with optimized settings
-- 📊 **Telemetry**: Receives live telemetry from the drone (PWM, roll, pitch) via ACK payloads
+- 📊 **Telemetry**: Receives live telemetry from the drone (PWM, roll, pitch, altitude hold state) via ACK payloads
+- 🎚️ **Altitude Hold**: Dedicated engage (buf[0] bit 4) and disengage (buf[1] bit 1) buttons; command sent as 1 / 0 / -1
 - 📺 **OLED Display**: 128×64 I2C OLED (SSD1306Ascii) for status and telemetry HUD—no framebuffer, RAM-friendly
 - 🏗️ **Clean Architecture**: Modular design with adapters and models for maintainability
 - ⚡ **Real-time Control**: Low-latency command transmission at 100Hz
@@ -54,10 +55,10 @@ synapse/
 
 ### Key Components
 
-- **T16000MParser**: Custom HID parser that extracts pitch, roll, yaw, throttle, and trim from joystick input
+- **T16000MParser**: HID parser for pitch, roll, yaw, throttle; hat/yaw/trim buttons; trim reset; altitude hold engage (buf[0] bit 4) and disengage (buf[1] bit 1)
 - **RadioAdapter**: nRF24L01 init, `send(DroneCommand)`, and `receiveTelemetry(TelemetryData)` via ACK payloads
-- **DroneCommand** / **DronePacket**: Flight control and trim; packed wire format for TX
-- **TelemetryData** / **TelemetryPacket**: Live telemetry (PWM, roll, pitch) from drone; packed wire format for RX
+- **DroneCommand** / **DronePacket**: Flight control, trim, trim reset, and altitude hold (int8_t: 1=engage, 0=no change, -1=disengage); packed wire format for TX
+- **TelemetryData** / **TelemetryPacket**: Live telemetry (PWM, roll, pitch, altitude hold state) from drone; packed wire format for RX
 - **SSD1306AsciiWire**: Lightweight I2C OLED driver (no framebuffer) for status and telemetry display
 
 ## Installation
@@ -110,26 +111,32 @@ The radio adapter is configured for range, reliability, and telemetry:
 - **Auto-ACK**: Enabled (required for telemetry via ACK payload)
 - **Retries**: 2 retries, 3×250µs delay
 
-### Joystick Mapping
+### Joystick Mapping (T16000M)
 
-The T16000M joystick is mapped as follows:
+**Axes**
+- **Pitch**: Forward/back stick (normalized -100 to +100)
+- **Roll**: Left/right stick (normalized -100 to +100)
+- **Yaw**: Twist axis (normalized -100 to +100)
+- **Throttle**: Throttle slider (0 to 100%)
 
-- **Pitch**: Forward/Backward stick movement (normalized to -100 to +100)
-- **Roll**: Left/Right stick movement (normalized to -100 to +100)
-- **Yaw**: Twist axis (normalized to -100 to +100)
-- **Throttle**: Throttle slider (normalized to 0 to 100%)
+**Trim**
+- **Hat (POV)**: Pitch trim (up/down), roll trim (left/right)
+- **Buttons (buf[0])**: Yaw trim left (bit 2), yaw trim right (bit 3), trim reset (bit 1)
+
+**Altitude hold**
+- **Engage**: buf[0] bit 4 (0x10) — sends `altitudeHold = 1`
+- **Disengage**: buf[1] bit 1 (0x02) — sends `altitudeHold = -1`
+- **Neither pressed**: sends `altitudeHold = 0` (no change)
 
 ### Command Format (TX → Drone)
 
 Commands are transmitted as a packed struct:
 ```cpp
 struct DronePacket {
-    int16_t pitch;    // -100 to +100
-    int16_t roll;     // -100 to +100
-    int16_t yaw;      // -100 to +100
-    int16_t throttle; // 0 to 100
-    int16_t rollTrim; int16_t pitchTrim; int16_t yawTrim;
+    int16_t pitch, roll, yaw, throttle;  // -100..+100 (throttle 0..100)
+    int16_t rollTrim, pitchTrim, yawTrim;
     uint8_t trimReset;
+    int8_t altitudeHold;  // 1 = engage, 0 = no change, -1 = disengage
 } __attribute__((packed));
 ```
 
@@ -140,13 +147,12 @@ Telemetry is sent back from the drone in the **ACK payload** of each command pac
 **Telemetry wire format** (packed):
 ```cpp
 struct TelemetryPacket {
-    int16_t pwm;   // Motor PWM
-    int16_t roll;  // Roll (e.g. x100 for degrees)
-    int16_t pitch; // Pitch (e.g. x100 for degrees)
+    int16_t pwm, roll, pitch;   // roll/pitch = angle_deg * 100
+    uint8_t altitudeHold;      // 1 = hold engaged, 0 = not
 } __attribute__((packed));
 ```
 
-The Cortex receiver must send a `TelemetryPacket` (or compatible struct) as the ACK payload when it acknowledges a command. The TX display shows **Ack** (telemetry received), **PWM**, **Roll**, and **Pitch** in the TELEMETRY section of the OLED HUD.
+Cortex must send this struct as the ACK payload when it acknowledges a command. The TX OLED shows **Ack**, **PWM**, **Roll**, **Pitch** (as decimals), and **AltHold** (ON/off) in the TELEMETRY section.
 
 ## Usage
 
@@ -154,7 +160,7 @@ The Cortex receiver must send a `TelemetryPacket` (or compatible struct) as the 
 2. **Connect** the Thrustmaster T16000M joystick to the USB Host Shield
 3. **Verify** initialization on the OLED: "Radio OK", "USB Host OK", "All systems ready"
 4. **Control** the drone by moving the joystick
-5. **Monitor** the OLED HUD: SYSTEM READY (throttle, sent status) and TELEMETRY (Ack, PWM, Roll, Pitch). Telemetry updates when the drone responds with an ACK payload
+5. **Monitor** the OLED HUD: SYSTEM READY (throttle, sent status) and TELEMETRY (Ack, PWM, Roll, Pitch, AltHold). Use the **engage** button to send altitude hold on, **disengage** to send off; when neither is pressed, the command sends 0 (no change).
 
 ## Troubleshooting
 
