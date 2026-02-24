@@ -33,11 +33,16 @@ void T16000MParser::setTrimReset(int trimReset) {
     this->trimReset = trimReset;
 }
 
+void T16000MParser::setAltitudeHold(int on) {
+    this->altitudeHold = on;
+}
+
 void T16000MParser::reset() {
     this->pitch = 0;
     this->roll = 0;
     this->yaw = 0;
     this->throttle = 0;
+    this->altitudeHold = 0;
 }
 
 // Getters
@@ -71,6 +76,10 @@ int T16000MParser::getYawTrim() {
 
 int T16000MParser::getTrimReset() {
     return this->trimReset;
+}
+
+int T16000MParser::getAltitudeHold() {
+    return this->altitudeHold;
 }
 
 // Override Parse method
@@ -125,14 +134,18 @@ void T16000MParser::Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf
     else if (buttons & 0x04) setYawTrim(-1); // Left
     else                     setYawTrim(0);  // None
 
-    // --- 5. READ RESET BUTTON---
+    // --- 5. READ RESET BUTTON ---
     // Button 2 is Bit 1 (0x02)
-    // 0000 0010
-    if (buttons & 0x02) {
-        setTrimReset(1);
-    } else {
-        setTrimReset(0);
-    }
+    if (buttons & 0x02) setTrimReset(1);
+    else                setTrimReset(0);
+
+    // --- 6. ALTITUDE HOLD: 1 = engage (buf[0] bit 4), -1 = disengage (buf[1] bit 1), 0 = neither ---
+    if (buttons & 0x10)
+        setAltitudeHold(1);   // Engage pressed
+    else if (len > 1 && (buf[1] & 0x02))
+        setAltitudeHold(-1); // Disengage pressed
+    else
+        setAltitudeHold(0);   // Nothing pressed
 }
 
 // Custom map function for -100..+100 normalization

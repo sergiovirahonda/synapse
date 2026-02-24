@@ -86,6 +86,7 @@ void loop() {
     droneCommand.setRollTrim(joyParser.getRollTrim());
     droneCommand.setYawTrim(joyParser.getYawTrim());
     droneCommand.setTrimReset(joyParser.getTrimReset());
+    droneCommand.setAltitudeHold(joyParser.getAltitudeHold());
     bool commandSent = radioAdapter.send(droneCommand);
     bool telemetryReceived = radioAdapter.receiveTelemetry(telemetryData);
     if (millis() - lastScreenUpdate > 500) {
@@ -94,7 +95,7 @@ void loop() {
         display.setCursor(0, 0);
         display.println(F("  -- SYSTEM READY --"));
         display.print(F("T: "));      display.print(droneCommand.getThrottle());
-        display.print(F(" | Sent: ")); display.print(commandSent);
+        display.print(F(" | Hold: ")); display.print(commandSent);
         display.clearToEOL();          display.println(); display.println();
         display.println(F("   -- TELEMETRY --"));
         display.print(F("Ack: "));    display.print(telemetryReceived);
@@ -102,6 +103,8 @@ void loop() {
         display.clearToEOL();          display.println();
         display.print(F("Roll: "));   display.print(roll);
         display.print(F(" | Pitch: ")); display.print(pitch);
+        display.clearToEOL();          display.println();
+        display.print(F("AltHold: ")); display.print(telemetryData.getAltitudeHold() ? F("ON") : F("off"));
         display.clearToEOL();          display.println();
 
         lastScreenUpdate = millis();
